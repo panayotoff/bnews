@@ -65,6 +65,45 @@ To read cached news without fetching feeds:
 bnews --offline
 ```
 
+## Update prompt
+
+Copy this prompt into your coding agent to update an existing installation:
+
+```text
+Update my existing BNews installation from
+https://github.com/panayotoff/bnews.git and keep the bnews shell command working.
+
+1. Locate the installation using command -v bnews and resolve any symlink.
+   Check ~/Applications/bnews as well. Determine whether the command runs
+   from a Git checkout or an installed Python package before making changes.
+2. For a Git checkout, inspect the remote, current branch, and working tree.
+   Preserve local changes and custom source configuration. Fetch origin
+   and update main with a fast-forward only. If local changes, a different
+   branch, or divergent commits prevent a safe update, explain the issue
+   and ask how to proceed; do not reset, clean, or discard files.
+3. For a packaged installation, obtain the latest source from the same
+   repository, build a new wheel, and install it into the environment used
+   by the existing bnews command. Do not install into a different Python
+   environment or replace a checkout installation with a packaged one.
+4. Preserve cached news, saved articles, custom feeds, and shell settings.
+   Keep the command's symlink valid and avoid duplicate PATH entries.
+5. Run python3 -m unittest discover -s tests in the updated source checkout.
+   Verify command -v bnews and bnews --help from outside the repository.
+6. Report the previous and new commit or package version, any unresolved
+   issues, and tell me to restart BNews by quitting it and running bnews.
+   If this environment blocks changes, give me the exact remaining commands
+   to run in my terminal.
+
+Use portable paths based on my home directory. Do not open the interactive
+TUI unless you have an interactive terminal available.
+```
+
+After updating, quit any running instance with `q` and launch it again:
+
+```sh
+bnews
+```
+
 Edit the example `sources.json` to add your preferred RSS or Atom feeds, then launch with `bnews --sources sources.json`:
 
 ```json
