@@ -3,19 +3,23 @@
 A keyboard-driven terminal news reader for Linux and macOS. Requires Python 3.10+; no third-party packages.
 
 ```sh
+git clone https://github.com/panayotoff/bnews.git
+cd bnews
 ./bnews
 ```
 
 Dnes.bg, Dnevnik.bg, Frognews, and Offnews are included. The opening screen lists sources: use arrows or j/k and Enter to select one. Esc returns to the source menu. The interface uses a cyan accent and a split headline/reading layout on wider terminals.
 
-To run the exact command `bnews` from any directory, add the project directory to your shell's PATH:
+To run `bnews` from any directory, run these commands from the project directory:
 
 ```sh
-export PATH="/home/bassta/Desktop/lynx-news:$PATH"
+mkdir -p "$HOME/.local/bin"
+ln -s "$(pwd)/bnews" "$HOME/.local/bin/bnews"
+export PATH="$HOME/.local/bin:$PATH"
 bnews
 ```
 
-Add the export line to `~/.zshrc` to retain it in new terminals. The executable resolves its bundled source file regardless of your working directory.
+Add the export line to `~/.zshrc` to retain it in new terminals (or `~/.bashrc` for Bash). Keep the project directory in place so the command's symlink continues to work. The executable resolves its bundled source file regardless of your working directory.
 
 Edit the example `sources.json` to add your preferred RSS or Atom feeds, then launch with `bnews --sources sources.json`:
 
