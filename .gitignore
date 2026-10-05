@@ -4,3 +4,9 @@ build/
 dist/
 *.egg-info/
 .venv/
+dnevnik-debug.html
+dnevnik-debug.html.json
+dnevnik-debug.html.netlog.json
+browser-debug.html
+browser-debug.html.json
+browser-debug.html.netlog.json

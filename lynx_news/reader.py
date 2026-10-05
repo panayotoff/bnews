@@ -7,6 +7,7 @@ import curses
 import hashlib
 import html
 from html.parser import HTMLParser
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -22,6 +23,7 @@ import urllib.request
 import urllib.error
 from urllib.parse import urljoin, urlparse
 import xml.etree.ElementTree as ET
+from .browser import render_page
 
 
 def clean(value):
@@ -216,15 +218,39 @@ class ArticleParser(HTMLParser):
         raise ValueError("Could not locate accessible article text; the publisher may restrict access")
 
 
-def fetch_article(url):
+def fetch_article(url, dump_path=None):
+    if not url.startswith(("http://", "https://")):
+        raise ValueError("Article URL must use HTTP or HTTPS")
     parser = ArticleParser()
     try:
         data = download(url, article=True)
     except urllib.error.HTTPError as error:
+        browser_fallback = error.code == 403 and urlparse(url).hostname in {"dnevnik.bg", "www.dnevnik.bg"}
+        # Cloudflare's bot check rejects HTTP clients by design; without the
+        # optional browser there is nothing to retry with.
+        challenged = error.code == 403 and (error.headers or {}).get("cf-mitigated") == "challenge"
+        if challenged and not (browser_fallback and importlib.util.find_spec("playwright")):
+            raise ValueError("publisher requires a browser check (Cloudflare), so the full text cannot be fetched here; press c to copy the link and read it in your browser") from error
+        if browser_fallback:
+            rendered = render_page(url) if dump_path is None else render_page(url, dump_path=dump_path)
+            if dump_path is not None:
+                Path(dump_path).write_text(rendered, encoding="utf-8")
+            title = re.search(r"<title[^>]*>(.*?)</title>", rendered, re.I | re.S)
+            if title and re.search(r"just a moment|access denied|forbidden|security verification|privacy error|site can.t be reached", clean(title.group(1)), re.I):
+                raise ValueError("Dnevnik also blocked the browser fetch; showing abstract") from error
+            parser.feed(rendered)
+            try:
+                return parser.extract()
+            except ValueError as extraction_error:
+                page_title = clean(title.group(1)) if title else "no page title"
+                raise ValueError(f"Browser returned a page titled '{page_title[:120]}', but article text was not found; use --check-article URL --dump-page FILE to inspect it") from extraction_error
         if error.code in (401, 402, 403):
             raise ValueError(f"HTTP {error.code}: publisher blocked article access") from error
         raise
-    parser.feed(data.decode("utf-8", errors="replace"))
+    page = data.decode("utf-8", errors="replace")
+    if dump_path is not None:
+        Path(dump_path).write_text(page, encoding="utf-8")
+    parser.feed(page)
     return parser.extract()
 
 
@@ -561,8 +587,33 @@ def main():
     parser = argparse.ArgumentParser(prog="bnews", description=__doc__)
     parser.add_argument("--sources", type=Path, default=Path(__file__).with_name("sources.json"))
     parser.add_argument("--offline", action="store_true", help="Read cached news without fetching feeds")
+    checks = parser.add_mutually_exclusive_group()
+    checks.add_argument("--check-article", metavar="URL", help="Test full-text fetching without opening the TUI")
+    checks.add_argument("--check-browser", metavar="URL", help="Test Chromium loading directly, without article extraction")
+    parser.add_argument("--dump-page", type=Path, metavar="FILE", help="With a check command, save HTML and browser diagnostics")
     parser.add_argument("--data-dir", type=Path, default=Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "lynx-news")
     args = parser.parse_args()
+    if args.dump_page and not (args.check_article or args.check_browser):
+        parser.error("--dump-page requires --check-article URL or --check-browser URL")
+    if args.check_browser:
+        if not args.check_browser.startswith(("http://", "https://")):
+            parser.error("Browser URL must use HTTP or HTTPS")
+        try:
+            page = render_page(args.check_browser, dump_path=args.dump_page)
+        except Exception as error:
+            parser.exit(1, f"Browser fetch failed: {error}\n")
+        print(f"Browser loaded page: {len(page)} HTML characters")
+        title = re.search(r"<title[^>]*>(.*?)</title>", page, re.I | re.S)
+        print("Page title: " + (clean(title.group(1)) if title else "no page title"))
+        return
+    if args.check_article:
+        try:
+            body = fetch_article(args.check_article, dump_path=args.dump_page)
+        except Exception as error:
+            parser.exit(1, f"Article fetch failed: {error}\n")
+        print(f"Article fetched: {len(body)} characters, {len(body.splitlines())} lines")
+        print(body[:300])
+        return
     try:
         sources = json.loads(args.sources.read_text())
         if not isinstance(sources, list) or not sources or any(not isinstance(s, dict) or not isinstance(s.get("name"), str) or not isinstance(s.get("url"), str) or not s["url"].startswith(("http://", "https://")) for s in sources):

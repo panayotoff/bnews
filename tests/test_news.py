@@ -5,6 +5,18 @@ from tempfile import TemporaryDirectory
 
 
 class FeedTests(unittest.TestCase):
+    def test_browser_check_bypasses_http_fetch_and_article_extraction(self):
+        import io
+        from contextlib import redirect_stdout
+        from unittest.mock import patch
+        from lynx_news.reader import main
+        output = io.StringIO()
+        with patch("sys.argv", ["bnews", "--check-browser", "https://example.com"]), patch("lynx_news.reader.render_page", return_value='<html><title>Example Domain</title><body>Example</body></html>') as render, patch("lynx_news.reader.fetch_article") as fetch, redirect_stdout(output):
+            main()
+        render.assert_called_once_with("https://example.com", dump_path=None)
+        fetch.assert_not_called()
+        self.assertIn("Page title: Example Domain", output.getvalue())
+
     def test_source_row_navigation_and_panel_focus(self):
         import curses
         with TemporaryDirectory() as directory:
@@ -46,10 +58,73 @@ class FeedTests(unittest.TestCase):
     def test_forbidden_article_has_actionable_message(self):
         from unittest.mock import patch
         from urllib.error import HTTPError
-        error = HTTPError("https://www.dnevnik.bg/story", 403, "Forbidden", {}, None)
+        error = HTTPError("https://example.com/story", 403, "Forbidden", {}, None)
         with patch("lynx_news.reader.download", side_effect=error):
             with self.assertRaisesRegex(ValueError, "HTTP 403: publisher blocked article access"):
-                fetch_article("https://www.dnevnik.bg/story")
+                fetch_article("https://example.com/story")
+
+    def test_dnevnik_403_uses_browser_and_extracts_paragraphs(self):
+        from unittest.mock import patch
+        from urllib.error import HTTPError
+        url = "https://www.dnevnik.bg/story"
+        page = '<title>News</title><div itemprop="articleBody"><p>' + 'Първи абзац. ' * 12 + '</p><p>Втори абзац.</p></div>'
+        with patch("lynx_news.reader.download", side_effect=HTTPError(url, 403, "Forbidden", {}, None)), patch("lynx_news.reader.render_page", return_value=page) as render:
+            body = fetch_article(url)
+        render.assert_called_once_with(url)
+        self.assertIn("\n\nВтори абзац.", body)
+
+    def test_dnevnik_browser_challenge_is_not_article_text(self):
+        from unittest.mock import patch
+        from urllib.error import HTTPError
+        url = "https://www.dnevnik.bg/story"
+        with patch("lynx_news.reader.download", side_effect=HTTPError(url, 403, "Forbidden", {}, None)), patch("lynx_news.reader.render_page", return_value='<title>Just a moment...</title><article>' + 'Challenge ' * 30 + '</article>'):
+            with self.assertRaisesRegex(ValueError, "also blocked the browser"):
+                fetch_article(url)
+
+    def test_debug_html_is_saved_when_extraction_fails(self):
+        from unittest.mock import patch
+        from urllib.error import HTTPError
+        url = "https://www.dnevnik.bg/story"
+        page = '<html><title>Dnevnik verification</title><main>Waiting for verification</main></html>'
+        with TemporaryDirectory() as directory:
+            target = Path(directory) / "debug.html"
+            with patch("lynx_news.reader.download", side_effect=HTTPError(url, 403, "Forbidden", {}, None)), patch("lynx_news.reader.render_page", return_value=page):
+                with self.assertRaisesRegex(ValueError, "Dnevnik verification"):
+                    fetch_article(url, dump_path=target)
+            self.assertEqual(target.read_text(), page)
+
+    def test_cloudflare_challenge_without_playwright_points_to_browser(self):
+        from unittest.mock import patch
+        from urllib.error import HTTPError
+        url = "https://www.dnevnik.bg/story"
+        error = HTTPError(url, 403, "Forbidden", {"cf-mitigated": "challenge"}, None)
+        with patch("lynx_news.reader.download", side_effect=error), patch("lynx_news.reader.importlib.util.find_spec", return_value=None), patch("lynx_news.reader.render_page") as render:
+            with self.assertRaisesRegex(ValueError, "browser check .Cloudflare.*press c to copy the link"):
+                fetch_article(url)
+        render.assert_not_called()
+
+    def test_dnevnik_payment_error_does_not_launch_browser(self):
+        from unittest.mock import patch
+        from urllib.error import HTTPError
+        url = "https://www.dnevnik.bg/story"
+        with patch("lynx_news.reader.download", side_effect=HTTPError(url, 402, "Payment Required", {}, None)), patch("lynx_news.reader.render_page") as render:
+            with self.assertRaisesRegex(ValueError, "HTTP 402"):
+                fetch_article(url)
+        render.assert_not_called()
+
+    def test_dnevnik_success_does_not_launch_browser(self):
+        from unittest.mock import patch
+        page = ('<article><p>' + 'Article text. ' * 20 + '</p></article>').encode()
+        with patch("lynx_news.reader.download", return_value=page), patch("lynx_news.reader.render_page") as render:
+            self.assertIn("Article text.", fetch_article("https://www.dnevnik.bg/story"))
+        render.assert_not_called()
+
+    def test_missing_browser_has_installation_hint(self):
+        from unittest.mock import patch
+        from lynx_news.browser import find_browser
+        with patch.dict("os.environ", {}, clear=True), patch("lynx_news.browser.shutil.which", return_value=None), patch("lynx_news.browser.Path.is_file", return_value=False):
+            with self.assertRaisesRegex(ValueError, "Install Chrome/Chromium"):
+                find_browser()
 
     def test_rss_content_and_safe_links(self):
         data = b'<rss><channel><item><title>A &amp; B</title><link>https://example.com/a</link><description>&lt;p&gt;Hello&lt;/p&gt;</description></item><item><link>javascript:alert(1)</link></item></channel></rss>'

@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+import os
+from pathlib import Path
+import sys
+
+# A checkout can keep optional browser dependencies in its own environment.
+# The existing shell symlink continues to work without shell activation.
+project_dir = Path(__file__).resolve().parent
+environment = project_dir / ".venv"
+interpreter = environment / "bin/python"
+if interpreter.exists() and Path(sys.prefix).resolve() != environment.resolve():
+    os.execv(str(interpreter), [str(interpreter), str(project_dir / "bnews"), *sys.argv[1:]])
+
 from lynx_news.reader import main
 
 main()

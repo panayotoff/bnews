@@ -1,6 +1,6 @@
 # BNews
 
-A keyboard-driven terminal news reader for Linux and macOS. Requires Python 3.10+; no third-party packages.
+A keyboard-driven terminal news reader for Linux and macOS. Requires Python 3.10+. Feed reading uses the Python standard library; optional browser fetching requires Playwright.
 
 ```sh
 git clone https://github.com/panayotoff/bnews.git
@@ -34,7 +34,9 @@ and make it available as the shell command bnews from any directory.
 2. Clone the repository into ~/Applications/bnews. If it already exists,
    check it before reusing it; preserve local changes.
 3. Ensure the repository's bnews launcher is executable. It runs directly
-   with Python and requires no third-party runtime packages.
+   with Python. For browser fetching, create .venv with python3 -m venv
+   .venv and install .venv/bin/python -m pip install -e '.[browser]'.
+   Ensure Chrome or Chromium is installed. The launcher uses .venv automatically.
 4. Create ~/.local/bin if needed and symlink ~/.local/bin/bnews to the
    absolute path of the repository's bnews launcher. Check any existing
    command or symlink first; do not overwrite an unrelated installation.
@@ -133,6 +135,57 @@ Use `--sources path/to/sources.json` for a different source list. Feed updates r
 | q | Quit |
 
 Articles show their feed abstract by default, including when full text is already cached. Press uppercase O to fetch and display full text in the background. The reader extracts article body containers or structured article text, preserves paragraphs, and caches the result for offline reading. The pane displays “Loading full article…” while fetching, or an error with the feed summary if the page is inaccessible or its text cannot be extracted. Press O again to retry a failed fetch. Publisher access restrictions still apply.
+
+### Dnevnik article fetching
+
+If Dnevnik returns HTTP 403, BNews tries loading the article with a locally installed Chrome or Chromium in headless mode. The rendered article text appears inside BNews; no browser window opens. This fallback only runs when you request full text with o/O, and successful results are cached.
+
+Dnevnik currently serves every page except its RSS feed behind a Cloudflare browser check (`cf-mitigated: challenge`). Without Playwright installed, BNews reports the check immediately and keeps the abstract; press c to copy the link and read the article in your browser. The headless fallback below is not guaranteed to pass that check.
+
+Install Chrome or Chromium and the optional Playwright dependency if you want this fallback. From the repository directory, run:
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -e '.[browser]'
+```
+
+The repository's `bnews` launcher automatically uses `.venv`, including through your shell symlink. For a packaged installation, install `bnews-tui[browser]` into its existing environment. BNews uses your installed browser, so a separate Playwright browser download is unnecessary.
+
+ Linux executables on PATH and standard macOS application locations are detected automatically. For another installation location, provide the browser executable:
+
+```sh
+BNEWS_BROWSER="/path/to/chromium" bnews
+```
+
+On Debian and Raspberry Pi, BNews prefers the installed Chromium binary over the desktop shell launcher, which can inject system extension and graphics settings. Extensions are disabled in the temporary browser session. An explicit `BNEWS_BROWSER` setting takes precedence over automatic detection.
+
+The browser uses a temporary profile rather than your existing browser session. Playwright controls navigation and waits for readable content after the document loads. Launching has a 15-second timeout, navigation a 30-second timeout, and readable content a 5-second timeout. If Dnevnik also blocks the browser, requires authentication, or does not expose article text, BNews retains the abstract.
+
+To diagnose a specific article without opening the TUI, copy its URL with c and run:
+
+```sh
+bnews --check-article 'https://www.dnevnik.bg/path/to/article/'
+```
+
+This prints the extracted character count and a short preview, or the fetch error. It does not modify the article cache.
+
+If extraction fails, save the HTML returned by the HTTP client or hidden browser for inspection:
+
+```sh
+bnews --check-article 'https://www.dnevnik.bg/path/to/article/' --dump-page dnevnik-debug.html
+```
+
+The HTML is saved before article extraction, including when the loaded page is an access screen. A browser navigation timeout produces diagnostics but no HTML file. Diagnostic files are excluded from Git.
+
+Browser diagnostics also produce `dnevnik-debug.html.json`, containing the Playwright fetch stage, document request status, failed requests, and detailed browser errors, plus `dnevnik-debug.html.netlog.json` with Chromium network events. These files are excluded from Git as well.
+
+To distinguish a publisher-specific problem from a general Chromium networking problem, test a simple page directly through the browser:
+
+```sh
+bnews --check-browser 'https://example.com' --dump-page browser-debug.html
+```
+
+This bypasses the ordinary HTTP fetcher and article extraction, and reports the loaded page title. It produces the same HTML, Playwright trace, and network-log diagnostics. The example diagnostic filenames are excluded from Git.
 
 The article title, publication time, and URL stay at the top while the text scrolls. Tab or left/right arrows switch panel focus; the active panel has a cyan label. Enter focuses the article. Below 65 columns, focusing the article displays it at full width. Esc returns to the source menu.
 

@@ -16,6 +16,9 @@ classifiers = [
   "Environment :: Console :: Curses",
 ]
 
+[project.optional-dependencies]
+browser = ["playwright>=1.50,<2"]
+
 [project.scripts]
 bnews = "lynx_news.reader:main"
 
