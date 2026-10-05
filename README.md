@@ -21,6 +21,50 @@ bnews
 
 Add the export line to `~/.zshrc` to retain it in new terminals (or `~/.bashrc` for Bash). Keep the project directory in place so the command's symlink continues to work. The executable resolves its bundled source file regardless of your working directory.
 
+## installation promt
+
+Copy this prompt into your coding agent to install BNews on Linux or macOS:
+
+```text
+Install BNews from https://github.com/panayotoff/bnews.git on this computer
+and make it available as the shell command bnews from any directory.
+
+1. Check that Python 3.10+ with curses and Git are available. If anything
+   is missing, help install it using the appropriate method for this OS.
+2. Clone the repository into ~/Applications/bnews. If it already exists,
+   check it before reusing it; preserve local changes.
+3. Ensure the repository's bnews launcher is executable. It runs directly
+   with Python and requires no third-party runtime packages.
+4. Create ~/.local/bin if needed and symlink ~/.local/bin/bnews to the
+   absolute path of the repository's bnews launcher. Check any existing
+   command or symlink first; do not overwrite an unrelated installation.
+5. Add ~/.local/bin to PATH for the current shell and persist it in the
+   appropriate startup file: ~/.zshrc for Zsh, ~/.bashrc for Bash, or the
+   equivalent for my shell. Avoid duplicate PATH entries and preserve
+   the rest of my shell configuration.
+6. Verify command -v bnews and bnews --help from outside the repository,
+   and run python3 -m unittest discover -s tests inside the repository.
+7. Tell me what was installed and show the command to launch it: bnews.
+   If this environment blocks filesystem or shell configuration changes,
+   give me the exact remaining commands to run in my terminal.
+
+Use portable paths based on my home directory. Keep the repository in
+place because the shell command points to it. Do not open the interactive
+TUI unless you have an interactive terminal available.
+```
+
+After installation, open a new terminal and run:
+
+```sh
+bnews
+```
+
+To read cached news without fetching feeds:
+
+```sh
+bnews --offline
+```
+
 Edit the example `sources.json` to add your preferred RSS or Atom feeds, then launch with `bnews --sources sources.json`:
 
 ```json
