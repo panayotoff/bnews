@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bnews-tui"
+version = "0.1.0"
+description = "A keyboard-driven Bulgarian news reader for the terminal"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "Environment :: Console :: Curses",
+]
+
+[project.scripts]
+bnews = "lynx_news.reader:main"
+
+[tool.setuptools]
+packages = ["lynx_news"]
+
+[tool.setuptools.package-data]
+lynx_news = ["sources.json"]
