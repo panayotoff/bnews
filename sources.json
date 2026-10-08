@@ -2,5 +2,5 @@
   {"name": "Dnes.bg", "url": "https://www.dnes.bg/rss.php?last", "website": "https://www.dnes.bg/"},
   {"name": "Dnevnik.bg", "url": "https://www.dnevnik.bg/rss/", "website": "https://www.dnevnik.bg/"},
   {"name": "Frognews", "url": "https://frognews.bg/rss.xml", "website": "https://frognews.bg/"},
-  {"name": "Offnews", "url": "https://feed.offnews.bg/rss/all", "website": "https://offnews.bg/"}
+  {"name": "Offnews", "url": "https://offnews.bg/rss/all", "website": "https://offnews.bg/"}
 ]
